@@ -42,9 +42,24 @@ export default function Home() {
   }
 
   return (
+    <>
     <div>
       <button onClick={handleOnClick}>get magic playlist</button>
-      <p>{clicked ? <a href={genres}>link</a> : ''}</p>
+      <div>
+        {clicked ? 
+        <p>
+        <iframe 
+            src="https://open.spotify.com/embed/playlist/0MJmxQHQgu4rcNFPbj2udN?utm_source=generator" 
+            width="100%" 
+            height="352" 
+            frameBorder="0" 
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+            loading="lazy">
+        </iframe>
+        </p>
+        : ''}
+      </div>
     </div>
+    </>
   );
 }
