@@ -1,21 +1,33 @@
 import { useState } from "react";
 import { key, clientId, clientSecret } from "./secretkey.tsx"; 
 
-async function getToken() {
-  const response = await fetch(
-    "https://accounts.spotify.com/api/token", 
-    {
-      body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      method: "POST"
-    }); 
-  const data = await response.json(); 
-  const token = data["access_token"]; 
-  console.log(token); 
-  return token; 
-}
+// async function getToken() {
+//   const response = await fetch(
+//     "https://accounts.spotify.com/api/token", 
+//     {
+//       body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
+//       headers: {
+//         "Content-Type": "application/x-www-form-urlencoded"
+//       },
+//       method: "POST"
+//     }); 
+//   const data = await response.json(); 
+//   const token = data["access_token"]; 
+//   console.log(token); 
+//   return token; 
+// }
+
+// async function getLink(playlistID: string) {
+//   const token = await getToken(); 
+//   const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistID}`, 
+//   {
+//     headers: {
+//       "Authorization": `Bearer ${token}`,
+//     }
+//   }); 
+//   const data = await response.json(); 
+//   return data["external_urls"]["spotify"]; 
+// }
 
 async function getChatGPTResponse(book: String) {
     const secret_key = key; 
@@ -26,7 +38,7 @@ async function getChatGPTResponse(book: String) {
             "messages": [
                 {
                     "role": "user",
-                    "content": `Generate a playlist based on the book ${book}`
+                    "content": `Generate a playlist based on the book ${book}, song name first`
                 }
             ]
         }), 
@@ -41,18 +53,6 @@ async function getChatGPTResponse(book: String) {
     const data = await response.json(); 
     console.log(data["choices"][0]["message"]["content"]); 
     return data["choices"][0]["message"]["content"]; 
-}
-
-async function getLink(playlistID: string) {
-  const token = await getToken(); 
-  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistID}`, 
-  {
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    }
-  }); 
-  const data = await response.json(); 
-  return data["external_urls"]["spotify"]; 
 }
 
 async function searchSpotify(artist: string, song: string) {
@@ -78,9 +78,9 @@ async function processSearches(artistList: string[], songList: string[]) {
   return playlistID; 
 }
 
-async function addSong(songURI: string, playlistID: string) {
+function addSong(songURI: string, playlistID: string) {
   const accessToken = getAccessTokenFromCookies(); 
-  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistID}/tracks`,
+  fetch(`https://api.spotify.com/v1/playlists/${playlistID}/tracks`,
   {
     headers: {
       "Authorization": `Bearer ${accessToken}`
@@ -170,7 +170,6 @@ function getAccessTokenFromCookies() {
 export default function Recommendations() {
   const [book, setBook] = useState(''); 
   const [clicked, setClicked] = useState(false); 
-  const [link, setLink] = useState(); 
   const [ID, setID] = useState(''); 
 
   function IDtoLink(id: string) {
