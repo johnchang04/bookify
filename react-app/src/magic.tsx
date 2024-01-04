@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { key } from "./secretkey.tsx"; 
+import { key, clientId, clientSecret } from "./secretkey.tsx"; 
 
 async function getToken() {
-  const clientId = "ea029b6633994c7894c87b0a528bd4fa"; 
-  const clientSecret = "a8da7458355b4f9fb1a112d5bc80e148"; 
   const response = await fetch(
     "https://accounts.spotify.com/api/token", 
     {
@@ -45,10 +43,9 @@ async function getChatGPTResponse(book: String) {
     return data["choices"][0]["message"]["content"]; 
 }
 
-async function getLink() {
+async function getLink(playlistID: string) {
   const token = await getToken(); 
-  const playlist_id = "0MJmxQHQgu4rcNFPbj2udN"; 
-  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}`, 
+  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistID}`, 
   {
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -58,29 +55,140 @@ async function getLink() {
   return data["external_urls"]["spotify"]; 
 }
 
-function extractSongs(songList: String) {
-    const re = /(?<=")[^\n"]+(?=")/g; 
-    console.log(songList.match(re)); 
-    return songList.match(re); 
+async function searchSpotify(artist: string, song: string) {
+  const testlink = 
+  `https://api.spotify.com/v1/search?q=remaster%2520track%3A${encodeURIComponent(song)}%2520artist%3A${encodeURIComponent(artist)}&type=track`
+  const accessToken = getAccessTokenFromCookies(); 
+  const response = await fetch(testlink, {
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+    }
+  })
+  const data = await response.json(); 
+  console.log(data["tracks"]["items"][0]["uri"])
+  return data["tracks"]["items"][0]["uri"]; 
+}
+
+async function processSearches(artistList: string[], songList: string[]) {
+  const playlistID = await createPlaylist(); 
+  for (let i = 0; i < songList.length; i++) {
+    const songURI = await searchSpotify(artistList[i], songList[i]); 
+    addSong(songURI, playlistID); 
+  }
+  return playlistID; 
+}
+
+async function addSong(songURI: string, playlistID: string) {
+  const accessToken = getAccessTokenFromCookies(); 
+  const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistID}/tracks`,
+  {
+    headers: {
+      "Authorization": `Bearer ${accessToken}`
+    }, 
+    body: JSON.stringify({
+      "uris": [`${songURI}`]
+    }), 
+    method: "POST"
+  }
+  )
+}
+
+function extractArtists(songList: string) {
+  const re = /(?<=(" by )|(" - )|(" – )|(" from ))[^\n-]+/g; 
+  console.log(songList.match(re)); 
+  return songList.match(re);
+}
+
+function extractSongs(songList: string) {
+  const re = /(?<=[0-9]. ")[^\n"]+(?=")/g; 
+  console.log(songList.match(re)); 
+  return songList.match(re); 
 }
 
 async function createPlaylist() {
-  const playlist = fetch(`https://api.spotify.com/v1/users/{}/playlists`)
+  const accessToken = getAccessTokenFromCookies(); 
+  try {
+    const response = await fetch(`https://api.spotify.com/v1/me/playlists`, 
+  {
+    body: JSON.stringify({
+      "name": "New Playlist",
+      "description": "Made with Bookify", 
+      "public": false,
+    }), 
+    headers: {
+      "Authorization": `Bearer ${accessToken}`, 
+      "Content-Type": "application/json"
+    }, 
+    method: "POST",
+  })
+  const data = await response.json(); 
+  return data["id"]
+  }
+  catch (error) {
+    console.log(error); 
+  }
+}
+
+async function getAccessTokenFromRefresh() {
+  const cookies = document.cookie.split(';')
+  for (let i = 0; i < cookies.length; i++) {
+    if (cookies[i].includes('refresh_token')) {
+      const refreshToken = cookies[i].substring(15);
+      const url = "https://accounts.spotify.com/api/token";
+
+    const payload = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: clientId
+      }),
+    }
+    const body = await fetch(url, payload);
+    const response = await body.json();
+
+    document.cookie = `refresh_token=${response.refresh_token}`
+    document.cookie = `access_token=${response.access_token}`
+    return response.access_token; 
+    }
+  }
+}
+
+function getAccessTokenFromCookies() {
+  const cookies = document.cookie.split(';')
+  for (let i = 0; i < cookies.length; i++) {
+    if (cookies[i].includes('access_token')) {
+      return cookies[i].substring(14);
+    }
+  }
+  return getAccessTokenFromRefresh(); 
 }
 
 export default function Recommendations() {
-  const [link, setLink] = useState('');
   const [book, setBook] = useState(''); 
   const [clicked, setClicked] = useState(false); 
+  const [link, setLink] = useState(); 
+  const [ID, setID] = useState(''); 
+
+  function IDtoLink(id: string) {
+    return "https://open.spotify.com/embed/playlist/"+ id + "?utm_source=generator"
+  }
+
 
   async function handleOnClick() {
-    let x = document.cookie; 
-    console.log(x); 
-    const playlistLink = await getLink(); 
-    setLink(playlistLink); 
+    // let x = document.cookie; 
+    // console.log(x); 
 
     var bookList = await getChatGPTResponse(book); 
-    bookList = extractSongs(bookList); 
+    var artistList = extractArtists(bookList); 
+    var songList = extractSongs(bookList); 
+    if (artistList && songList) {
+      const playlistID = await processSearches(artistList, songList); 
+      setID(playlistID); 
+    }
 
     setClicked(true); 
   }
@@ -95,14 +203,13 @@ export default function Recommendations() {
         {clicked ? 
         <div>
         <iframe 
-            src="https://open.spotify.com/embed/playlist/0MJmxQHQgu4rcNFPbj2udN?utm_source=generator" 
+            src={IDtoLink(ID)}
             width="100%" 
             height="352" 
             frameBorder="0" 
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
             loading="lazy">
         </iframe>
-        <a href={link}>link</a>
         </div>
         : ''}
       </div>
