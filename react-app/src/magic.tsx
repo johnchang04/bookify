@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { key } from "./secretkey.tsx"; 
 
 async function getToken() {
   const clientId = "ea029b6633994c7894c87b0a528bd4fa"; 
@@ -19,7 +20,7 @@ async function getToken() {
 }
 
 async function getChatGPTResponse(book: String) {
-    const key = "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"
+    const secret_key = key; 
     const response = await fetch(`https://api.openai.com/v1/chat/completions`,
     {
         body: JSON.stringify({
@@ -32,7 +33,7 @@ async function getChatGPTResponse(book: String) {
             ]
         }), 
         headers: {
-            "Authorization": `Bearer ${key}`,
+            "Authorization": `Bearer ${secret_key}`,
             "Content-type": "application/json"            
         },
         method: "POST"
@@ -63,12 +64,18 @@ function extractSongs(songList: String) {
     return songList.match(re); 
 }
 
-export default function Home() {
+async function createPlaylist() {
+  const playlist = fetch(`https://api.spotify.com/v1/users/{}/playlists`)
+}
+
+export default function Recommendations() {
   const [link, setLink] = useState('');
   const [book, setBook] = useState(''); 
   const [clicked, setClicked] = useState(false); 
 
   async function handleOnClick() {
+    let x = document.cookie; 
+    console.log(x); 
     const playlistLink = await getLink(); 
     setLink(playlistLink); 
 
@@ -80,14 +87,14 @@ export default function Home() {
 
   return (
     <>
-    <div>
+      <div>  
       <input type="text" value={book} onChange={(e) => setBook(e.target.value)}/><br/>
       <button onClick={handleOnClick}>generate magic playlist</button>
       <div id="song-list"></div>
       <div>
         {clicked ? 
         <div>
-        {/* <iframe 
+        <iframe 
             src="https://open.spotify.com/embed/playlist/0MJmxQHQgu4rcNFPbj2udN?utm_source=generator" 
             width="100%" 
             height="352" 
@@ -95,7 +102,7 @@ export default function Home() {
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
             loading="lazy">
         </iframe>
-        <a href={link}>link</a> */}
+        <a href={link}>link</a>
         </div>
         : ''}
       </div>
